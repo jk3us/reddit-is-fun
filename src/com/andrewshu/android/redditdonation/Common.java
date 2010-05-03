@@ -20,11 +20,9 @@
 package com.andrewshu.android.redditdonation;
 
 import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -72,6 +70,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.preference.PreferenceManager;
@@ -91,7 +90,7 @@ public class Common {
 	private static final DefaultHttpClient mGzipHttpClient = createGzipHttpClient();
 	private static final Pattern REDDIT_LINK = Pattern.compile(
       "https?://(?:[\\w-]+\\.)?reddit.com" +
-      "(?:/r/([^/.]+))?" +
+      "(?:/r/([^/.]+|reddit\\.com))?" +
       "(?:/comments/([^/.]+)/[^/.]+" +
           "(?:/([^/.]+))?" +
       ")?/?");
@@ -111,11 +110,14 @@ public class Common {
      * Set the Drawable for the list selector etc. based on the current theme.
      */
 	static void updateListDrawables(ListActivity la, int theme) {
-		final ListView lv = la.getListView();
+		ListView lv = la.getListView();
+		Resources res = la.getResources();
 		if (theme == R.style.Reddit_Light) {
     		lv.setSelector(R.drawable.list_selector_blue);
+    		lv.setCacheColorHint(res.getColor(R.color.white));
     	} else if (theme == R.style.Reddit_Dark) {
     		lv.setSelector(android.R.drawable.list_selector_background);
+    		lv.setCacheColorHint(res.getColor(R.color.android_dark_background));
     	}
 	}
 	
@@ -151,7 +153,10 @@ public class Common {
     	// Notifications
     	editor.putString(Constants.PREF_MAIL_NOTIFICATION_STYLE, rSettings.mailNotificationStyle);
     	editor.putString(Constants.PREF_MAIL_NOTIFICATION_SERVICE, rSettings.mailNotificationService);
-    
+
+        //OnClickAction
+        editor.putString(Constants.PREF_ON_CLICK, rSettings.onClickAction);
+
     	editor.commit();
     }
     
@@ -198,6 +203,9 @@ public class Common {
         // Notifications
         rSettings.setMailNotificationStyle(sessionPrefs.getString(Constants.PREF_MAIL_NOTIFICATION_STYLE, Constants.PREF_MAIL_NOTIFICATION_STYLE_DEFAULT));
         rSettings.setMailNotificationService(sessionPrefs.getString(Constants.PREF_MAIL_NOTIFICATION_SERVICE, Constants.PREF_MAIL_NOTIFICATION_SERVICE_OFF));
+
+        //OnClickAction
+        rSettings.setOnClickAction(sessionPrefs.getString(Constants.PREF_ON_CLICK, Constants.PREF_ON_CLICK_FIRST_TIME));
     }
     
     /**
@@ -206,7 +214,7 @@ public class Common {
      * Should be called from a background thread.
      * @return Error message, or null on success
      */
-    static String doLogin(CharSequence username, CharSequence password, DefaultHttpClient client, RedditSettings settings) {
+    static String doLogin(CharSequence username, CharSequence password, RedditSettings settings, DefaultHttpClient client, Context context) {
 		String status = "";
     	String userError = "Error logging in. Please try again.";
     	HttpEntity entity = null;
@@ -286,6 +294,8 @@ public class Common {
         	settings.setUsername(username);
         	settings.setLoggedIn(true);
         	
+        	CacheInfo.invalidateAllCaches(context);
+        	
         	return null;
 
     	} catch (Exception e) {
@@ -293,18 +303,19 @@ public class Common {
     			try {
     				entity.consumeContent();
     			} catch (Exception e2) {
-    				if (Constants.LOGGING) Log.e(TAG, e.getMessage());
+    				if (Constants.LOGGING) Log.e(TAG, "entity.consumeContent():" + e.getMessage());
     			}
     		}
-    		if (Constants.LOGGING) Log.e(TAG, e.getMessage());
+    		if (Constants.LOGGING) Log.e(TAG, "doLogin():" + e.getMessage());
         }
     	settings.setLoggedIn(false);
         return userError;
     }
     
         
-    static void doLogout(RedditSettings settings, DefaultHttpClient client) {
+    static void doLogout(RedditSettings settings, DefaultHttpClient client, Context context) {
     	client.getCookieStore().clear();
+    	CacheInfo.invalidateAllCaches(context);
     	settings.setUsername(null);
         settings.setLoggedIn(false);
     }
@@ -368,14 +379,121 @@ public class Common {
     			try {
     				entity.consumeContent();
     			} catch (Exception e2) {
-    				if (Constants.LOGGING) Log.e(TAG, e.getMessage());
+    				if (Constants.LOGGING) Log.e(TAG, "entity.consumeContent():" + e.getMessage());
     			}
     		}
-    		if (Constants.LOGGING) Log.e(TAG, e.getMessage());
+    		if (Constants.LOGGING) Log.e(TAG, "doUpdateModhash():" + e.getMessage());
     		return null;
     	}
     }
     
+    static String checkResponseErrors(HttpResponse response, HttpEntity entity) {
+    	String status = response.getStatusLine().toString();
+    	String line;
+    	
+    	if (!status.contains("OK")) {
+    		return "HTTP error. Status = "+status;
+    	}
+    	
+    	try {
+    		BufferedReader in = new BufferedReader(new InputStreamReader(entity.getContent()));
+    		line = in.readLine();
+    		if (Constants.LOGGING) Common.logDLong(TAG, line);
+        	in.close();
+    	} catch (IOException e) {
+    		if (Constants.LOGGING) Log.e(TAG, "IOException:" + e.getMessage());
+    		return "Error reading retrieved data.";
+    	}
+    	
+    	if (line == null || Constants.EMPTY_STRING.equals(line)) {
+    		return "API returned empty data.";
+    	}
+    	if (line.contains("WRONG_PASSWORD")) {
+    		return "Wrong password.";
+    	}
+    	if (line.contains("USER_REQUIRED")) {
+    		// The modhash probably expired
+    		return "Login expired.";
+    	}
+    	if (line.contains("SUBREDDIT_NOEXIST")) {
+    		return "That subreddit does not exist.";
+    	}
+    	if (line.contains("SUBREDDIT_NOTALLOWED")) {
+    		return "You are not allowed to post to that subreddit.";
+    	}
+    	
+    	return null;
+    }
+    
+
+	static String checkIDResponse(HttpResponse response, HttpEntity entity) throws CaptchaException, Exception {
+	    // Group 1: fullname. Group 2: kind. Group 3: id36.
+	    final Pattern NEW_ID_PATTERN = Pattern.compile("\"id\": \"((.+?)_(.+?))\"");
+	    // Group 1: whole error. Group 2: the time part
+	    final Pattern RATELIMIT_RETRY_PATTERN = Pattern.compile("(you are trying to submit too fast. try again in (.+?)\\.)");
+
+	    String status = response.getStatusLine().toString();
+    	String line;
+    	
+    	if (!status.contains("OK")) {
+    		throw new Exception("HTTP error. Status = "+status);
+    	}
+    	
+    	try {
+    		BufferedReader in = new BufferedReader(new InputStreamReader(entity.getContent()));
+    		line = in.readLine();
+    		if (Constants.LOGGING) Common.logDLong(TAG, line);
+        	in.close();
+    	} catch (IOException e) {
+    		if (Constants.LOGGING) Log.e(TAG, "IOException:" + e.getMessage());
+    		throw new Exception("Error reading retrieved data.");
+    	}
+    	
+    	if (line == null || Constants.EMPTY_STRING.equals(line)) {
+    		throw new Exception("API returned empty data.");
+    	}
+    	if (line.contains("WRONG_PASSWORD")) {
+    		throw new Exception("Wrong password.");
+    	}
+    	if (line.contains("USER_REQUIRED")) {
+    		// The modhash probably expired
+    		throw new Exception("Login expired.");
+    	}
+    	if (line.contains("SUBREDDIT_NOEXIST")) {
+    		throw new Exception("That subreddit does not exist.");
+    	}
+    	if (line.contains("SUBREDDIT_NOTALLOWED")) {
+    		throw new Exception("You are not allowed to post to that subreddit.");
+    	}
+    	
+    	String newId;
+    	Matcher idMatcher = NEW_ID_PATTERN.matcher(line);
+    	if (idMatcher.find()) {
+    		newId = idMatcher.group(3);
+    	} else {
+    		if (line.contains("RATELIMIT")) {
+        		// Try to find the # of minutes using regex
+            	Matcher rateMatcher = RATELIMIT_RETRY_PATTERN.matcher(line);
+            	if (rateMatcher.find())
+            		throw new Exception(rateMatcher.group(1));
+            	else
+            		throw new Exception("you are trying to submit too fast. try again in a few minutes.");
+        	}
+    		if (line.contains("DELETED_LINK")) {
+    			throw new Exception("the link you are commenting on has been deleted");
+    		}
+    		if (line.contains("BAD_CAPTCHA")) {
+    			throw new CaptchaException("Bad CAPTCHA. Try again.");
+    		}
+        	// No id returned by reply POST.
+    		return null;
+    	}
+    	
+    	// Getting here means success.
+    	return newId;
+	}
+    
+	
     static class PeekEnvelopeTask extends AsyncTask<Void, Void, Integer> {
     	private Context mContext;
     	private DefaultHttpClient mClient;
@@ -463,7 +581,7 @@ public class Common {
 				// Should validate each field but I'm lazy
 				jp.nextToken(); // move to value
 				if (Constants.JSON_NEW.equals(namefield)) {
-					if (Constants.TRUE_STRING.equals(jp.getText()))
+					if ("true".equals(jp.getText()))
 						count++;
 					else
 						// Stop parsing on first old message
@@ -497,69 +615,35 @@ public class Common {
     }
     
     static void launchBrowser(CharSequence url, Activity act) {
-      Matcher matcher = REDDIT_LINK.matcher(url);
-      if (matcher.matches()) {
-        if (matcher.group(3) != null) {
-          Intent intent = new Intent(act.getApplicationContext(), CommentsListActivity.class);
-          intent.putExtra(Constants.EXTRA_COMMENT_CONTEXT, url);
-          act.startActivity(intent);
-          return;
-        } else if (matcher.group(2) != null) {
-          Intent intent = new Intent(act.getApplicationContext(), CommentsListActivity.class);
-          intent.putExtra(ThreadInfo.SUBREDDIT, matcher.group(1));
-          intent.putExtra(ThreadInfo.ID, matcher.group(2));
-          intent.putExtra(ThreadInfo.NUM_COMMENTS, Constants.DEFAULT_COMMENT_DOWNLOAD_LIMIT);
-          act.startActivity(intent);
-          return;
-        } else if (matcher.group(1) != null) {
-          Intent intent = new Intent(act.getApplicationContext(), RedditIsFun.class);
-          intent.putExtra(ThreadInfo.SUBREDDIT, matcher.group(1));
-          act.startActivity(intent);
-          return;
-        }
-      }
-      Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse(url.toString()));
-      browser.putExtra(Browser.EXTRA_APPLICATION_ID, act.getPackageName());
-      act.startActivity(browser);
-    }
-    
-    
-    static boolean isFreshCache(long cacheTime) {
-		long time = System.currentTimeMillis();
-		return time - cacheTime <= Constants.DEFAULT_FRESH_DURATION;
+    	Matcher matcher = REDDIT_LINK.matcher(url);
+    	if (matcher.matches()) {
+    		if (matcher.group(3) != null) {
+    			CacheInfo.invalidateCachedThread(act);
+    			Intent intent = new Intent(act.getApplicationContext(), CommentsListActivity.class);
+    			intent.putExtra(Constants.EXTRA_COMMENT_CONTEXT, url);
+    			act.startActivity(intent);
+    			return;
+    		} else if (matcher.group(2) != null) {
+    			CacheInfo.invalidateCachedThread(act);
+    			Intent intent = new Intent(act.getApplicationContext(), CommentsListActivity.class);
+    			intent.putExtra(Constants.EXTRA_SUBREDDIT, matcher.group(1));
+    			intent.putExtra(Constants.EXTRA_ID, matcher.group(2));
+    			intent.putExtra(Constants.EXTRA_NUM_COMMENTS, Constants.DEFAULT_COMMENT_DOWNLOAD_LIMIT);
+    			act.startActivity(intent);
+    			return;
+    		} else if (matcher.group(1) != null) {
+    			CacheInfo.invalidateCachedSubreddit(act);
+    			Intent intent = new Intent(act.getApplicationContext(), RedditIsFun.class);
+    			intent.putExtra(Constants.EXTRA_SUBREDDIT, matcher.group(1));
+    			act.startActivity(intent);
+    			return;
+    		}
+    	}
+    	Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse(url.toString()));
+    	browser.putExtra(Browser.EXTRA_APPLICATION_ID, act.getPackageName());
+    	act.startActivity(browser);
 	}
     
-    static void deleteAllCaches(Context context) {
-    	for (String fileName : context.fileList()) {
-    		context.deleteFile(fileName);
-    	}
-    }
-    
-    static void deleteCachesOlderThan(Context context, long someTime) {
-    	FileInputStream fis = null;
-    	ObjectInputStream in = null;
-    	
-		try {
-	    	fis = context.openFileInput(Constants.FILENAME_CACHE_TIME);
-			in = new ObjectInputStream(fis);
-			long cacheTime = in.readLong();
-			
-			// If at least one file is new enough, don't delete caches.
-			if (cacheTime >= someTime)
-				return;
-    	} catch (Exception e) {
-    		// Bad or missing time file. Delete cache.
-    	} finally {
-    		try {
-    			in.close();
-    		} catch (Exception ignore) {}
-    		try {
-    			fis.close();
-    		} catch (Exception ignore) {}
-    	}
-    	deleteAllCaches(context);
-    }
-	
     
 	/**
 	 * http://hc.apache.org/httpcomponents-client/examples.html

@@ -23,26 +23,33 @@ import android.app.Activity;
 
 public class Constants {
 	
-	static final boolean LOGGING = false;
+	static final boolean LOGGING = true;
+	
+	static final boolean USE_CACHE = true;
 	
 	// File containing the serialized variables of last subreddit viewed
 	static final String FILENAME_SUBREDDIT_CACHE = "subreddit.dat";
 	// File containing the serialized variables of last comments viewed
-	static final String FILENAME_COMMENTS_CACHE = "comments.dat";
+	static final String FILENAME_THREAD_CACHE = "thread.dat";
 	// File containing a long integer System.currentTimeMillis(). Timestamp is shared among caches.
-	static final String FILENAME_CACHE_TIME = "cachetime.dat";
+	static final String FILENAME_CACHE_INFO = "cacheinfo.dat";
+	static final String[] FILENAMES_CACHE = {
+		FILENAME_SUBREDDIT_CACHE, FILENAME_THREAD_CACHE, FILENAME_CACHE_INFO
+	};
 	
 	static final String COMMENT_KIND = "t1";
 	static final String THREAD_KIND = "t3";
 	static final String MESSAGE_KIND = "t4";
 	static final String SUBREDDIT_KIND = "t5";
-	
+	static final String MORE_KIND = "more";
+    
 	// Requires a non-default font
 	static final String LOOK_OF_DISAPPROVAL = "\u0ca0\u005f\u0ca0";
 
 	static final int DEFAULT_THREAD_DOWNLOAD_LIMIT = 25;
     static final int DEFAULT_COMMENT_DOWNLOAD_LIMIT = 200;
     static final long DEFAULT_FRESH_DURATION = 1800000;  // 30 minutes
+    static final long DEFAULT_FRESH_SUBREDDIT_LIST_DURATION = 86400000;  // 24 hours
 
     // startActivityForResult request codes
     static final int ACTIVITY_PICK_SUBREDDIT = 0;
@@ -57,10 +64,14 @@ public class Constants {
     // --- Intent extras ---
     // Tell PickSubredditActivity to hide the fronptage string
     static final String EXTRA_HIDE_FRONTPAGE_STRING = "hideFrontpage";
+    static final String EXTRA_ID = "id";
     // Tell CommentsListActivity to jump to a comment context (a URL. pattern match)
     static final String EXTRA_COMMENT_CONTEXT = "jumpToComment";
     // Tell CommentsListActivity to show "more children"
     static final String EXTRA_MORE_CHILDREN_ID = "moreChildrenId";
+    static final String EXTRA_NUM_COMMENTS = "num_comments";
+    static final String EXTRA_SUBREDDIT = "subreddit";
+    static final String EXTRA_TITLE = "title";
     
     // User-defined result codes
     static final int RESULT_LOGIN_REQUIRED = Activity.RESULT_FIRST_USER;
@@ -88,19 +99,15 @@ public class Constants {
     static final int DIALOG_EDIT = 29;
     static final int DIALOG_DELETE = 30;
     static final int DIALOG_COMPOSE = 31;
+    static final int DIALOG_FIRST_ON_CLICK = 32;
     // progress dialogs
     static final int DIALOG_LOGGING_IN = 1000;
-    static final int DIALOG_LOADING_THREADS_LIST = 1001;
-    static final int DIALOG_LOADING_COMMENTS_LIST = 1002;
     static final int DIALOG_LOADING_LOOK_OF_DISAPPROVAL = 1003;
     static final int DIALOG_SUBMITTING = 1004;
     static final int DIALOG_REPLYING = 1005;
     static final int DIALOG_LOADING_REDDITS_LIST = 1006;
-    static final int DIALOG_LOADING_INBOX = 1007;
     static final int DIALOG_DELETING = 1008;
     static final int DIALOG_EDITING = 1009;
-    static final int DIALOG_LOADING_THREADS_CACHE = 1010;
-    static final int DIALOG_LOADING_COMMENTS_CACHE = 1011;
     static final int DIALOG_COMPOSING = 1012;
     
     // Special CSS for webviews to match themes
@@ -114,9 +121,6 @@ public class Constants {
     static final int[] STATE_NONE = new int[0];
     
     // Strings
-    static final String TRUE_STRING = "true";
-    static final String FALSE_STRING = "false";
-    static final String NULL_STRING = "null";
     static final String EMPTY_STRING = "";
     static final String NO_STRING = "no";
     
@@ -126,13 +130,16 @@ public class Constants {
     static final String HAVE_MAIL_TEXT = "You have reddit mail.";
     
     // save instance state Bundle keys
-    static final String URL_TO_GET_HERE_KEY = "url_to_get_here";
-    static final String JUMP_TO_COMMENT_POSITION_KEY = "jump_to_comment_position";
+    static final String DELETE_TARGET_KIND_KEY = "delete_target_kind";
+    static final String EDIT_TARGET_BODY_KEY = "edit_target_body";
+    static final String ID_KEY = "id";
     static final String JUMP_TO_COMMENT_ID_KEY = "jump_to_comment_id";
+    static final String JUMP_TO_COMMENT_CONTEXT_KEY = "jump_to_comment_context";
+    static final String JUMP_TO_COMMENT_POSITION_KEY = "jump_to_comment_position";
     static final String JUMP_TO_THREAD_ID_KEY = "jump_to_thread_id";
     static final String REPLY_TARGET_NAME_KEY = "reply_target_name";
-    static final String EDIT_TARGET_BODY_KEY = "edit_target_body";
-    static final String DELETE_TARGET_KIND_KEY = "delete_target_kind";
+    static final String SUBREDDIT_KEY = "subreddit";
+    static final String URL_TO_GET_HERE_KEY = "url_to_get_here";
     
     static final String THREAD_COUNT = "threadCount";
     
@@ -220,7 +227,6 @@ public class Constants {
     static final String JSON_MEDIA = "media";
     static final String JSON_MEDIA_EMBED = "media_embed";
     static final String JSON_MODHASH = "modhash";
-    static final String JSON_MORE = "more";
     static final String JSON_NEW = "new";
     static final String JSON_NUM_COMMENTS = "num_comments";
     static final String JSON_TITLE = "title";
@@ -254,6 +260,10 @@ public class Constants {
     static final String PREF_MAIL_NOTIFICATION_SERVICE_1HOUR = "MAIL_NOTIFICATION_SERVICE_1HOUR";
     static final String PREF_MAIL_NOTIFICATION_SERVICE_6HOURS = "MAIL_NOTIFICATION_SERVICE_6HOURS";
     static final String PREF_MAIL_NOTIFICATION_SERVICE_1DAY = "MAIL_NOTIFICATION_SERVICE_1DAY";
+    static final String PREF_ON_CLICK = "on_click";
+    static final String PREF_ON_CLICK_OPEN_LINK = "ON_CLICK_OPEN_LINK";
+    static final String PREF_ON_CLICK_OPEN_DIALOG = "ON_CLICK_OPEN_DIALOG";
+    static final String PREF_ON_CLICK_FIRST_TIME = "ON_CLICK_FIRST_TIME";
     
     // A short HTML file returned by reddit, so we can get the modhash
     static final String MODHASH_URL = "http://www.reddit.com/r";
