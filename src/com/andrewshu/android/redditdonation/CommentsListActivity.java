@@ -101,6 +101,7 @@ public class CommentsListActivity extends ListActivity
     private final Pattern COMMENT_CONTEXT_PATTERN = Pattern.compile("(http://www.reddit.com)?/r/(.+?)/comments/(.+?)/.+?/(?:([a-zA-Z0-9]+)(?:\\?context=(\\d+))?)?");
 
     private final ObjectMapper om = new ObjectMapper();
+    private final DrawableManager drawableManager = new DrawableManager();
     private final Markdown markdown = new Markdown();
     
     /** Custom list adapter that fits our threads data into the list. */
@@ -322,6 +323,8 @@ public class CommentsListActivity extends ListActivity
 	                ImageView voteUpView = (ImageView) view.findViewById(R.id.vote_up_image);
 	                ImageView voteDownView = (ImageView) view.findViewById(R.id.vote_down_image);
 	                TextView selftextView = (TextView) view.findViewById(R.id.selftext);
+	                ImageView thumbnailView = (ImageView) view.findViewById(R.id.thumbnail);
+	                View dividerView = view.findViewById(R.id.divider);
 	                
 	                submitterView.setVisibility(View.VISIBLE);
 	                submissionTimeView.setVisibility(View.VISIBLE);
@@ -388,6 +391,28 @@ public class CommentsListActivity extends ListActivity
 	            	} else {
 	            		selftextView.setVisibility(View.GONE);
 	            	}
+	            	
+		            // Thumbnails open links
+		            if (thumbnailView != null) {
+		            	if (mSettings.loadThumbnails) {
+			            	final String url = item.getUrl();
+			            	// Fill in the thumbnail using a Thread. Note that thumbnail URL can be absolute path.
+			            	if (item.getThumbnail() != null && !Constants.EMPTY_STRING.equals(item.getThumbnail())) {
+			            		dividerView.setVisibility(View.VISIBLE);
+			            		thumbnailView.setVisibility(View.VISIBLE);
+			            		drawableManager.fetchDrawableOnThread(Util.absolutePathToURL(item.getThumbnail()), thumbnailView);
+			            	} else {
+			            		// if no thumbnail image, hide thumbnail icon
+			            		dividerView.setVisibility(View.GONE);
+			            		thumbnailView.setVisibility(View.GONE);
+			            	}
+		            	} else {
+		            		// if thumbnails disabled, hide thumbnail icon
+		            		dividerView.setVisibility(View.GONE);
+		            		thumbnailView.setVisibility(View.GONE);
+		            	}
+		            }
+	            	
 	            } else if (mHiddenComments.contains(position)) { 
 	            	if (convertView == null) {
 	            		// Doesn't matter which view we inflate since it's gonna be invisible
@@ -932,14 +957,6 @@ public class CommentsListActivity extends ListActivity
     		if (_mPositionOffset == 0)
     			enableLoadingScreen();
     		
-	    	if (mSettings.subreddit != null && "jailbait".equals(mSettings.subreddit.toString())) {
-	    		Toast lodToast = Toast.makeText(CommentsListActivity.this, "", Toast.LENGTH_LONG);
-	    		View lodView = ((LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE))
-	    			.inflate(R.layout.look_of_disapproval_view, null);
-	    		lodToast.setView(lodView);
-	    		lodToast.show();
-	    	}
-
 	    	if (mThreadTitle != null)
 	    		setTitle(mThreadTitle + " : " + mSettings.subreddit);
     	}

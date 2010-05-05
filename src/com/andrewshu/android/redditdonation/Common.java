@@ -70,7 +70,6 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.Resources;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.preference.PreferenceManager;
@@ -111,13 +110,10 @@ public class Common {
      */
 	static void updateListDrawables(ListActivity la, int theme) {
 		ListView lv = la.getListView();
-		Resources res = la.getResources();
 		if (theme == R.style.Reddit_Light) {
     		lv.setSelector(R.drawable.list_selector_blue);
-    		lv.setCacheColorHint(res.getColor(R.color.white));
     	} else if (theme == R.style.Reddit_Dark) {
     		lv.setSelector(android.R.drawable.list_selector_background);
-    		lv.setCacheColorHint(res.getColor(R.color.android_dark_background));
     	}
 	}
 	
@@ -150,12 +146,12 @@ public class Common {
     	// Rotation
     	editor.putString(Constants.PREF_ROTATION, RedditSettings.Rotation.toString(rSettings.rotation));
     	
+    	// Thumbnails
+    	editor.putBoolean(Constants.PREF_LOAD_THUMBNAILS, rSettings.loadThumbnails);
+    	
     	// Notifications
     	editor.putString(Constants.PREF_MAIL_NOTIFICATION_STYLE, rSettings.mailNotificationStyle);
     	editor.putString(Constants.PREF_MAIL_NOTIFICATION_SERVICE, rSettings.mailNotificationService);
-
-        //OnClickAction
-        editor.putString(Constants.PREF_ON_CLICK, rSettings.onClickAction);
 
     	editor.commit();
     }
@@ -200,12 +196,12 @@ public class Common {
         rSettings.setRotation(RedditSettings.Rotation.valueOf(
         		sessionPrefs.getString(Constants.PREF_ROTATION, Constants.PREF_ROTATION_UNSPECIFIED)));
         
+        // Thumbnails
+        rSettings.setLoadThumbnails(sessionPrefs.getBoolean(Constants.PREF_LOAD_THUMBNAILS, true));
+
         // Notifications
         rSettings.setMailNotificationStyle(sessionPrefs.getString(Constants.PREF_MAIL_NOTIFICATION_STYLE, Constants.PREF_MAIL_NOTIFICATION_STYLE_DEFAULT));
         rSettings.setMailNotificationService(sessionPrefs.getString(Constants.PREF_MAIL_NOTIFICATION_SERVICE, Constants.PREF_MAIL_NOTIFICATION_SERVICE_OFF));
-
-        //OnClickAction
-        rSettings.setOnClickAction(sessionPrefs.getString(Constants.PREF_ON_CLICK, Constants.PREF_ON_CLICK_FIRST_TIME));
     }
     
     /**
@@ -639,11 +635,11 @@ public class Common {
     			return;
     		}
     	}
-    	Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse(url.toString()));
+    	Uri uri = Util.optimizeMobileUri(Uri.parse(url.toString()));
+    	Intent browser = new Intent(Intent.ACTION_VIEW, uri);
     	browser.putExtra(Browser.EXTRA_APPLICATION_ID, act.getPackageName());
     	act.startActivity(browser);
 	}
-    
     
 	/**
 	 * http://hc.apache.org/httpcomponents-client/examples.html

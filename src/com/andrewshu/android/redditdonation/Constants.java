@@ -23,7 +23,7 @@ import android.app.Activity;
 
 public class Constants {
 	
-	static final boolean LOGGING = true;
+	static final boolean LOGGING = false;
 	
 	static final boolean USE_CACHE = true;
 	
@@ -43,9 +43,6 @@ public class Constants {
 	static final String SUBREDDIT_KIND = "t5";
 	static final String MORE_KIND = "more";
     
-	// Requires a non-default font
-	static final String LOOK_OF_DISAPPROVAL = "\u0ca0\u005f\u0ca0";
-
 	static final int DEFAULT_THREAD_DOWNLOAD_LIMIT = 25;
     static final int DEFAULT_COMMENT_DOWNLOAD_LIMIT = 200;
     static final long DEFAULT_FRESH_DURATION = 1800000;  // 30 minutes
@@ -99,12 +96,10 @@ public class Constants {
     static final int DIALOG_EDIT = 29;
     static final int DIALOG_DELETE = 30;
     static final int DIALOG_COMPOSE = 31;
-    static final int DIALOG_FIRST_ON_CLICK = 32;
     static final int DIALOG_REPORT = 33;
 
     // progress dialogs
     static final int DIALOG_LOGGING_IN = 1000;
-    static final int DIALOG_LOADING_LOOK_OF_DISAPPROVAL = 1003;
     static final int DIALOG_SUBMITTING = 1004;
     static final int DIALOG_REPLYING = 1005;
     static final int DIALOG_LOADING_REDDITS_LIST = 1006;
@@ -253,6 +248,7 @@ public class Constants {
     static final String PREF_ROTATION_UNSPECIFIED = "ROTATION_UNSPECIFIED";
     static final String PREF_ROTATION_PORTRAIT = "ROTATION_PORTRAIT";
     static final String PREF_ROTATION_LANDSCAPE = "ROTATION_LANDSCAPE";
+    static final String PREF_LOAD_THUMBNAILS = "load_thumbnails";
     static final String PREF_MAIL_NOTIFICATION_STYLE = "mail_notification_style";
     static final String PREF_MAIL_NOTIFICATION_STYLE_DEFAULT = "MAIL_NOTIFICATION_STYLE_DEFAULT";
     static final String PREF_MAIL_NOTIFICATION_STYLE_BIG_ENVELOPE = "MAIL_NOTIFICATION_STYLE_BIG_ENVELOPE";
@@ -264,10 +260,6 @@ public class Constants {
     static final String PREF_MAIL_NOTIFICATION_SERVICE_1HOUR = "MAIL_NOTIFICATION_SERVICE_1HOUR";
     static final String PREF_MAIL_NOTIFICATION_SERVICE_6HOURS = "MAIL_NOTIFICATION_SERVICE_6HOURS";
     static final String PREF_MAIL_NOTIFICATION_SERVICE_1DAY = "MAIL_NOTIFICATION_SERVICE_1DAY";
-    static final String PREF_ON_CLICK = "on_click";
-    static final String PREF_ON_CLICK_OPEN_LINK = "ON_CLICK_OPEN_LINK";
-    static final String PREF_ON_CLICK_OPEN_DIALOG = "ON_CLICK_OPEN_DIALOG";
-    static final String PREF_ON_CLICK_FIRST_TIME = "ON_CLICK_FIRST_TIME";
     
     // A short HTML file returned by reddit, so we can get the modhash
     static final String MODHASH_URL = "http://www.reddit.com/r";

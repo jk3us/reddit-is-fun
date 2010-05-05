@@ -85,6 +85,9 @@ public final class RedditIsFun extends ListActivity {
 	private static final String TAG = "RedditIsFun";
 	
 	private final ObjectMapper om = new ObjectMapper();
+	// DrawableManager helps with filling in thumbnails
+	private final DrawableManager drawableManager = new DrawableManager();
+
 	
     /** Custom list adapter that fits our threads data into the list. */
     private ThreadsListAdapter mThreadsAdapter = null;
@@ -254,8 +257,6 @@ public final class RedditIsFun extends ListActivity {
     	static final int VIEW_TYPE_COUNT = 2;
     	public boolean mIsLoading = true;
     	private LayoutInflater mInflater;
-//        private boolean mDisplayThumbnails = false; // TODO: use this
-//        private SparseArray<SoftReference<Bitmap>> mBitmapCache = null; // TODO?: use this?
     	private int mFrequentSeparatorPos = ListView.INVALID_POSITION;
         
         public ThreadsListAdapter(Context context, List<ThingInfo> objects) {
@@ -310,6 +311,8 @@ public final class RedditIsFun extends ListActivity {
 	//            TextView submissionTimeView = (TextView) view.findViewById(R.id.submissionTime);
 	            ImageView voteUpView = (ImageView) view.findViewById(R.id.vote_up_image);
 	            ImageView voteDownView = (ImageView) view.findViewById(R.id.vote_down_image);
+	            ImageView thumbnailView = (ImageView) view.findViewById(R.id.thumbnail);
+	            View dividerView = view.findViewById(R.id.divider);
 	            
 	            // Set the title and domain using a SpannableStringBuilder
 	            SpannableStringBuilder builder = new SpannableStringBuilder();
@@ -344,10 +347,6 @@ public final class RedditIsFun extends ListActivity {
 	            } else {
 	            	subredditView.setVisibility(View.GONE);
 	            }
-	//            submitterView.setText(item.getAuthor());
-	            // TODO: convert submission time to a displayable time
-	//            Date submissionTimeDate = new Date((long) (Double.parseDouble(item.getCreated()) / 1000));
-	//            submissionTimeView.setText("5 hours ago");
 	            
 	            // Set the up and down arrow colors based on whether user likes
 	            if (mSettings.loggedIn) {
@@ -370,62 +369,37 @@ public final class RedditIsFun extends ListActivity {
 	        		votesView.setTextColor(res.getColor(R.color.gray));
 	            }
 	            
-	            // TODO?: Thumbnail
-	//            view.getThumbnail().
-	
-	            // TODO: If thumbnail, download it and create ImageView
-	            // Some thumbnails may be absolute paths instead of URLs:
-	            // "/static/noimage.png"
-	            
-	            // Set the proper icon (star or presence or nothing)
-	//            ImageView presenceView = cache.presenceView;
-	//            if ((mMode & MODE_MASK_NO_PRESENCE) == 0) {
-	//                int serverStatus;
-	//                if (!cursor.isNull(SERVER_STATUS_COLUMN_INDEX)) {
-	//                    serverStatus = cursor.getInt(SERVER_STATUS_COLUMN_INDEX);
-	//                    presenceView.setImageResource(
-	//                            Presence.getPresenceIconResourceId(serverStatus));
-	//                    presenceView.setVisibility(View.VISIBLE);
-	//                } else {
-	//                    presenceView.setVisibility(View.GONE);
-	//                }
-	//            } else {
-	//                presenceView.setVisibility(View.GONE);
-	//            }
-	//
-	//            // Set the photo, if requested
-	//            if (mDisplayPhotos) {
-	//                Bitmap photo = null;
-	//
-	//                // Look for the cached bitmap
-	//                int pos = cursor.getPosition();
-	//                SoftReference<Bitmap> ref = mBitmapCache.get(pos);
-	//                if (ref != null) {
-	//                    photo = ref.get();
-	//                }
-	//
-	//                if (photo == null) {
-	//                    // Bitmap cache miss, decode it from the cursor
-	//                    if (!cursor.isNull(PHOTO_COLUMN_INDEX)) {
-	//                        try {
-	//                            byte[] photoData = cursor.getBlob(PHOTO_COLUMN_INDEX);
-	//                            photo = BitmapFactory.decodeByteArray(photoData, 0,
-	//                                    photoData.length);
-	//                            mBitmapCache.put(pos, new SoftReference<Bitmap>(photo));
-	//                        } catch (OutOfMemoryError e) {
-	//                            // Not enough memory for the photo, use the default one instead
-	//                            photo = null;
-	//                        }
-	//                    }
-	//                }
-	//
-	//                // Bind the photo, or use the fallback no photo resource
-	//                if (photo != null) {
-	//                    cache.photoView.setImageBitmap(photo);
-	//                } else {
-	//                    cache.photoView.setImageResource(R.drawable.ic_contact_list_picture);
-	//                }
-	//            }
+	            // Thumbnails open links
+	            if (thumbnailView != null) {
+	            	if (mSettings.loadThumbnails) {
+	            		dividerView.setVisibility(View.VISIBLE);
+	            		thumbnailView.setVisibility(View.VISIBLE);
+	            		
+		            	final String url = item.getUrl();
+		            	final String jumpToId = item.getId();
+		            	thumbnailView.setOnClickListener(new OnClickListener() {
+		            		public void onClick(View v) {
+		            			mJumpToThreadId = jumpToId;
+		            			Common.launchBrowser(url, RedditIsFun.this);
+		            		}
+		            	});
+		            	// Fill in the thumbnail using a Thread. Note that thumbnail URL can be absolute path.
+		            	if (item.getThumbnail() != null && !Constants.EMPTY_STRING.equals(item.getThumbnail()))
+		            		drawableManager.fetchDrawableOnThread(Util.absolutePathToURL(item.getThumbnail()), thumbnailView);
+		            	else
+		            		thumbnailView.setImageResource(R.drawable.go_arrow);
+		            	
+		            	// Set thumbnail background based on current theme
+		            	if (mSettings.theme == R.style.Reddit_Light)
+		            		thumbnailView.setBackgroundResource(R.drawable.thumbnail_background_light);
+		            	else
+		            		thumbnailView.setBackgroundResource(R.drawable.thumbnail_background_dark);
+	            	} else {
+	            		// if thumbnails disabled, hide thumbnail icon
+	            		dividerView.setVisibility(View.GONE);
+	            		thumbnailView.setVisibility(View.GONE);
+	            	}
+	            }
             } else {
             	// The "25 more" list item
             	if (convertView == null)
@@ -475,18 +449,14 @@ public final class RedditIsFun extends ListActivity {
     protected void onListItemClick(ListView l, View v, int position, long id) {
         ThingInfo item = mThreadsAdapter.getItem(position);
         
-        // Mark the thread as selected
-        mVoteTargetThingInfo = item;
-        mJumpToThreadId = item.getId();
-        
-        // if mThreadsAdapter.getCount() - 1 contains the "next 25, prev 25" buttons,
+    	// Mark the thread as selected
+    	mVoteTargetThingInfo = item;
+    	mJumpToThreadId = item.getId();
+
+    	// if mThreadsAdapter.getCount() - 1 contains the "next 25, prev 25" buttons,
         // or if there are fewer than 25 threads...
         if (position < mThreadsAdapter.getCount() - 1 || mThreadsAdapter.getCount() < Constants.DEFAULT_THREAD_DOWNLOAD_LIMIT + 1) {
-            if (mSettings.onClickAction.equals(Constants.PREF_ON_CLICK_OPEN_LINK)) {
-                Common.launchBrowser(item.getUrl(), RedditIsFun.this);
-            } else {
-                onLongListItemClick(v, position, id);
-            }
+            showDialog(Constants.DIALOG_THING_CLICK);
         } else {
         	// 25 more. Use buttons.
         }
@@ -668,8 +638,8 @@ public final class RedditIsFun extends ListActivity {
                 	pin.close();
                 	in.close();
                 }
-            } catch (IOException e) {
-            	if (Constants.LOGGING) Log.e(TAG, "DownloadThreadsTask IOException:" + e.getMessage());
+            } catch (Exception e) {
+            	if (Constants.LOGGING) Log.e(TAG, "DownloadThreadsTask:" + e.getMessage());
             } finally {
         		if (entity != null) {
         			try {
@@ -723,14 +693,6 @@ public final class RedditIsFun extends ListActivity {
     		resetUI(null);
     		enableLoadingScreen();
 			
-	    	if ("jailbait".equals(mSettings.subreddit.toString())) {
-	    		Toast lodToast = Toast.makeText(RedditIsFun.this, "", Toast.LENGTH_LONG);
-	    		View lodView = ((LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE))
-	    			.inflate(R.layout.look_of_disapproval_view, null);
-	    		lodToast.setView(lodView);
-	    		lodToast.show();
-	    	}
-
 	    	getWindow().setFeatureInt(Window.FEATURE_PROGRESS, 0);
 	    	
 	    	if (Constants.FRONTPAGE_STRING.equals(mSettings.subreddit))
@@ -1116,26 +1078,6 @@ public final class RedditIsFun extends ListActivity {
     		dialog = builder.setView(inflater.inflate(R.layout.thread_click_dialog, null)).create();
     		break;
     		
-    	case Constants.DIALOG_FIRST_ON_CLICK:
-    		builder = new AlertDialog.Builder(this);
-    		builder.setMessage("Always open link immediately?\n(Long click to open vote/link/comments dialog.)\nYou can always change this in Settings.")
-    			.setPositiveButton("Always open link", new DialogInterface.OnClickListener() {
-    				public void onClick(DialogInterface dialog, int id) {
-    					dialog.dismiss();
-    					mSettings.setOnClickAction(Constants.PREF_ON_CLICK_OPEN_LINK);
-    	                Common.launchBrowser(mVoteTargetThingInfo.getUrl(), RedditIsFun.this);
-    				}
-    			})
-    			.setNegativeButton("Show vote/link/comments dialog", new DialogInterface.OnClickListener() {
-    				public void onClick(DialogInterface dialog, int id) {
-    					dialog.dismiss();
-    					mSettings.setOnClickAction(Constants.PREF_ON_CLICK_OPEN_DIALOG);
-    	                Common.launchBrowser(mVoteTargetThingInfo.getUrl(), RedditIsFun.this);
-    				}
-    			});
-    		dialog = builder.create();
-    		break;
-    		
     	case Constants.DIALOG_SORT_BY:
     		builder = new AlertDialog.Builder(this);
     		builder.setTitle("Sort by:");
@@ -1235,15 +1177,7 @@ public final class RedditIsFun extends ListActivity {
     		pdialog = new ProgressDialog(this);
     		pdialog.setMessage("Logging in...");
     		pdialog.setIndeterminate(true);
-    		pdialog.setCancelable(true);
-    		dialog = pdialog;
-    		break;
-    	case Constants.DIALOG_LOADING_LOOK_OF_DISAPPROVAL:
-    		pdialog = new ProgressDialog(this);
-    		pdialog.setIndeterminate(true);
-    		pdialog.setCancelable(true);
-    		pdialog.requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
-    		pdialog.setFeatureDrawableResource(Window.FEATURE_INDETERMINATE_PROGRESS, R.drawable.look_of_disapproval);
+    		pdialog.setCancelable(false);
     		dialog = pdialog;
     		break;
     	
@@ -1332,12 +1266,8 @@ public final class RedditIsFun extends ListActivity {
             	linkButton.setOnClickListener(new OnClickListener() {
     				public void onClick(View v) {
     					dismissDialog(Constants.DIALOG_THING_CLICK);
-    					if (mSettings.onClickAction.equals(Constants.PREF_ON_CLICK_FIRST_TIME)) {
-    						showDialog(Constants.DIALOG_FIRST_ON_CLICK);
-    					} else {
-	    					// Launch Intent to goto the URL
-	    					Common.launchBrowser(url, RedditIsFun.this);
-    					}
+    					// Launch Intent to goto the URL
+    					Common.launchBrowser(url, RedditIsFun.this);
     				}
     			});
             	linkButton.setEnabled(true);
@@ -1418,7 +1348,6 @@ public final class RedditIsFun extends ListActivity {
     protected void onRestoreInstanceState(Bundle state) {
         super.onRestoreInstanceState(state);
         final int[] myDialogs = {
-        	Constants.DIALOG_LOADING_LOOK_OF_DISAPPROVAL,
         	Constants.DIALOG_LOGGING_IN,
         	Constants.DIALOG_LOGIN,
         	Constants.DIALOG_SORT_BY,
