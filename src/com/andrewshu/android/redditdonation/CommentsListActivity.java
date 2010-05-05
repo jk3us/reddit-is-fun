@@ -82,6 +82,7 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.AdapterContextMenuInfo;
@@ -156,6 +157,7 @@ public class CommentsListActivity extends ListActivity
         setRequestedOrientation(mSettings.rotation);
         setTheme(mSettings.theme);
         requestWindowFeature(Window.FEATURE_PROGRESS);
+        requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
     	
         setContentView(R.layout.comments_list_content);
         // The above layout contains a list id "android:list"
@@ -325,6 +327,7 @@ public class CommentsListActivity extends ListActivity
 	                TextView selftextView = (TextView) view.findViewById(R.id.selftext);
 	                ImageView thumbnailView = (ImageView) view.findViewById(R.id.thumbnail);
 	                View dividerView = view.findViewById(R.id.divider);
+	                ProgressBar indeterminateProgressBar = (ProgressBar) view.findViewById(R.id.indeterminate_progress);
 	                
 	                submitterView.setVisibility(View.VISIBLE);
 	                submissionTimeView.setVisibility(View.VISIBLE);
@@ -395,21 +398,32 @@ public class CommentsListActivity extends ListActivity
 		            // Thumbnails open links
 		            if (thumbnailView != null) {
 		            	if (mSettings.loadThumbnails) {
-			            	final String url = item.getUrl();
+		            		dividerView.setVisibility(View.VISIBLE);
+		            		thumbnailView.setVisibility(View.VISIBLE);
+		            		indeterminateProgressBar.setVisibility(View.GONE);
+		            		
+		            		final String url = item.getUrl();
 			            	// Fill in the thumbnail using a Thread. Note that thumbnail URL can be absolute path.
 			            	if (item.getThumbnail() != null && !Constants.EMPTY_STRING.equals(item.getThumbnail())) {
-			            		dividerView.setVisibility(View.VISIBLE);
-			            		thumbnailView.setVisibility(View.VISIBLE);
-			            		drawableManager.fetchDrawableOnThread(Util.absolutePathToURL(item.getThumbnail()), thumbnailView);
+			            		drawableManager.fetchDrawableOnThread(Util.absolutePathToURL(item.getThumbnail()),
+			            				thumbnailView, indeterminateProgressBar, CommentsListActivity.this);
 			            	} else {
 			            		// if no thumbnail image, hide thumbnail icon
 			            		dividerView.setVisibility(View.GONE);
 			            		thumbnailView.setVisibility(View.GONE);
+			            		indeterminateProgressBar.setVisibility(View.GONE);
 			            	}
+			            	
+			            	// Set thumbnail background based on current theme
+			            	if (mSettings.theme == R.style.Reddit_Light)
+			            		thumbnailView.setBackgroundResource(R.drawable.thumbnail_background_light);
+			            	else
+			            		thumbnailView.setBackgroundResource(R.drawable.thumbnail_background_dark);
 		            	} else {
 		            		// if thumbnails disabled, hide thumbnail icon
 		            		dividerView.setVisibility(View.GONE);
 		            		thumbnailView.setVisibility(View.GONE);
+		            		indeterminateProgressBar.setVisibility(View.GONE);
 		            	}
 		            }
 	            	
@@ -1591,8 +1605,10 @@ public class CommentsListActivity extends ListActivity
     	if (mSettings.loggedIn) {
 	        menu.findItem(R.id.login_logout_menu_id).setTitle(
 	        		getResources().getString(R.string.logout)+": " + mSettings.username);
+	        menu.findItem(R.id.inbox_menu_id).setVisible(true);
     	} else {
             menu.findItem(R.id.login_logout_menu_id).setTitle(getResources().getString(R.string.login));
+            menu.findItem(R.id.inbox_menu_id).setVisible(false);
     	}
     	
     	// Edit and delete
@@ -1739,8 +1755,8 @@ public class CommentsListActivity extends ListActivity
     	int rowId = (int) info.id;
     	
     	if (rowId == 0) {
-    		if (mSettings.loggedIn)
-    			menu.add(0, Constants.DIALOG_REPORT, Menu.NONE, "Report thread");
+//    		if (mSettings.loggedIn)
+//    			menu.add(0, Constants.DIALOG_REPORT, Menu.NONE, "Report thread");
     	} else if (mMorePositions.contains(rowId)) {
     		menu.add(0, Constants.DIALOG_GOTO_PARENT, Menu.NONE, "Go to parent");
     	} else if (mHiddenCommentHeads.contains(rowId)) {
@@ -1754,8 +1770,8 @@ public class CommentsListActivity extends ListActivity
 	    		}
     		}
     		menu.add(0, Constants.DIALOG_HIDE_COMMENT, Menu.NONE, "Hide comment");
-    		if (mSettings.loggedIn)
-    			menu.add(0, Constants.DIALOG_REPORT, Menu.NONE, "Report comment");
+//    		if (mSettings.loggedIn)
+//    			menu.add(0, Constants.DIALOG_REPORT, Menu.NONE, "Report comment");
     		menu.add(0, Constants.DIALOG_GOTO_PARENT, Menu.NONE, "Go to parent");
     	}
     }
