@@ -107,6 +107,13 @@ public class Constants {
     static final int DIALOG_EDITING = 1009;
     static final int DIALOG_COMPOSING = 1012;
     
+	static final int SHARE_CONTEXT_ITEM = 1013;
+	static final int OPEN_IN_BROWSER_CONTEXT_ITEM = 1014;
+	static final int OPEN_COMMENTS_CONTEXT_ITEM = 1015;
+	static final int SAVE_CONTEXT_ITEM = 1016;
+	static final int UNSAVE_CONTEXT_ITEM = 1017;
+
+    
     // Special CSS for webviews to match themes
     static final String CSS_DARK = "<style>body{color:#c0c0c0;background-color:#191919}a:link{color:#ffffff}</style>";
 
@@ -134,13 +141,13 @@ public class Constants {
     static final String JUMP_TO_COMMENT_CONTEXT_KEY = "jump_to_comment_context";
     static final String JUMP_TO_COMMENT_POSITION_KEY = "jump_to_comment_position";
     static final String JUMP_TO_THREAD_ID_KEY = "jump_to_thread_id";
+    static final String LAST_AFTER_KEY = "last_after";
+    static final String LAST_BEFORE_KEY = "last_before";
     static final String REPORT_TARGET_NAME_KEY = "report_target_name";
     static final String REPLY_TARGET_NAME_KEY = "reply_target_name";
     static final String SUBREDDIT_KEY = "subreddit";
-    static final String URL_TO_GET_HERE_KEY = "url_to_get_here";
+    static final String THREAD_COUNT_KEY = "thread_count";
     static final String VOTE_TARGET_THING_INFO_KEY = "vote_target_thing_info";
-    
-    static final String THREAD_COUNT = "threadCount";
     
     static final String SUBMIT_KIND_LINK = "link";
     static final String SUBMIT_KIND_SELF = "self";

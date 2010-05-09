@@ -320,6 +320,7 @@ public class CommentsListActivity extends ListActivity
 	                TextView votesView = (TextView) view.findViewById(R.id.votes);
 	                TextView numCommentsView = (TextView) view.findViewById(R.id.numComments);
 	                TextView subredditView = (TextView) view.findViewById(R.id.subreddit);
+	                TextView nsfwView = (TextView) view.findViewById(R.id.nsfw);
 	                TextView submissionTimeView = (TextView) view.findViewById(R.id.submissionTime);
 	                TextView submitterView = (TextView) view.findViewById(R.id.submitter);
 	                ImageView voteUpView = (ImageView) view.findViewById(R.id.vote_up_image);
@@ -334,7 +335,7 @@ public class CommentsListActivity extends ListActivity
 	                
 	                // Set the title and domain using a SpannableStringBuilder
 	                SpannableStringBuilder builder = new SpannableStringBuilder();
-	                String title = mOpThingInfo.getTitle().replaceAll("\n ", " ").replaceAll(" \n", " ").replaceAll("\n", " ");
+	                String title = mOpThingInfo.getTitle();
 	                SpannableString titleSS = new SpannableString(title);
 	                int titleLen = title.length();
 	                TextAppearanceSpan titleTAS = new TextAppearanceSpan(getApplicationContext(), R.style.TextAppearance_14sp);
@@ -364,7 +365,13 @@ public class CommentsListActivity extends ListActivity
 	                submissionTimeView.setText(Util.getTimeAgo(mOpThingInfo.getCreated_utc()));
 	                submitterView.setText("by "+mOpThingInfo.getAuthor());
 	                
-	                // Set the up and down arrow colors based on whether user likes
+	                if(item.isOver_18()){
+	                    nsfwView.setVisibility(View.VISIBLE);
+	                } else {
+	                    nsfwView.setVisibility(View.GONE);
+	                }
+	                
+		            // Set the up and down arrow colors based on whether user likes
 	                if (mSettings.loggedIn) {
 	                	if (mOpThingInfo.getLikes() == null) {
 	                		voteUpView.setImageResource(R.drawable.vote_up_gray);
@@ -402,8 +409,7 @@ public class CommentsListActivity extends ListActivity
 		            		thumbnailView.setVisibility(View.VISIBLE);
 		            		indeterminateProgressBar.setVisibility(View.GONE);
 		            		
-		            		final String url = item.getUrl();
-			            	// Fill in the thumbnail using a Thread. Note that thumbnail URL can be absolute path.
+		            		// Fill in the thumbnail using a Thread. Note that thumbnail URL can be absolute path.
 			            	if (item.getThumbnail() != null && !Constants.EMPTY_STRING.equals(item.getThumbnail())) {
 			            		drawableManager.fetchDrawableOnThread(Util.absolutePathToURL(item.getThumbnail()),
 			            				thumbnailView, indeterminateProgressBar, CommentsListActivity.this);
@@ -415,10 +421,13 @@ public class CommentsListActivity extends ListActivity
 			            	}
 			            	
 			            	// Set thumbnail background based on current theme
-			            	if (mSettings.theme == R.style.Reddit_Light)
+			            	if (mSettings.theme == R.style.Reddit_Light) {
 			            		thumbnailView.setBackgroundResource(R.drawable.thumbnail_background_light);
-			            	else
+			            		indeterminateProgressBar.setBackgroundResource(R.drawable.thumbnail_background_light);
+			            	} else {
 			            		thumbnailView.setBackgroundResource(R.drawable.thumbnail_background_dark);
+			            		indeterminateProgressBar.setBackgroundResource(R.drawable.thumbnail_background_dark);
+			            	}
 		            	} else {
 		            		// if thumbnails disabled, hide thumbnail icon
 		            		dividerView.setVisibility(View.GONE);
@@ -884,6 +893,8 @@ public class CommentsListActivity extends ListActivity
 					}
 				}
 				// Pull other data from the OP
+				mOpThingInfo.setTitle(StringEscapeUtils.unescapeHtml(mOpThingInfo.getTitle().trim()
+						.replaceAll("\r", "").replaceAll("\n ", " ").replaceAll(" \n", " ").replaceAll("\n", " ")));
 				// do markdown
 				mOpThingInfo.setSelftext(StringEscapeUtils.unescapeHtml(mOpThingInfo.getSelftext().trim().replaceAll("\r", "")));
     			mOpThingInfo.setSSBSelftext(markdown.markdown(mOpThingInfo.getSelftext(), new SpannableStringBuilder(), mOpThingInfo.getUrls()));
@@ -990,10 +1001,8 @@ public class CommentsListActivity extends ListActivity
     			// We modified mCommentsList, which backs mCommentsAdapter, so mCommentsAdapter has changed too.
     			mCommentsAdapter.notifyDataSetChanged();
     			// Set title in android titlebar
-    			if (mThreadTitle == null) {
-	    			mThreadTitle = mOpThingInfo.getTitle().replaceAll("\n ", " ").replaceAll(" \n", " ").replaceAll("\n", " ");
-	    		}
-    			setTitle(mThreadTitle + " : " + mSettings.subreddit);
+    			if (mThreadTitle != null)
+    				setTitle(mThreadTitle + " : " + mSettings.subreddit);
 	    		// Point the list to last comment user was looking at, if any
 	    		jumpToComment();
     		} else {
@@ -1755,8 +1764,13 @@ public class CommentsListActivity extends ListActivity
     	int rowId = (int) info.id;
     	
     	if (rowId == 0) {
-//    		if (mSettings.loggedIn)
-//    			menu.add(0, Constants.DIALOG_REPORT, Menu.NONE, "Report thread");
+    		if(mOpThingInfo.isSaved()){
+    			menu.add(0, Constants.UNSAVE_CONTEXT_ITEM, Menu.NONE, "Unsave");
+    		} else {
+    			menu.add(0, Constants.SAVE_CONTEXT_ITEM, Menu.NONE, "Save");
+    		}
+    		
+    		menu.add(0, Constants.SHARE_CONTEXT_ITEM, Menu.NONE, "Share");
     	} else if (mMorePositions.contains(rowId)) {
     		menu.add(0, Constants.DIALOG_GOTO_PARENT, Menu.NONE, "Go to parent");
     	} else if (mHiddenCommentHeads.contains(rowId)) {
@@ -1782,12 +1796,37 @@ public class CommentsListActivity extends ListActivity
     	int rowId = (int) info.id;
     	
     	switch (item.getItemId()) {
+    	case Constants.SAVE_CONTEXT_ITEM:
+    		new SaveTask(true, mOpThingInfo, mSettings, this, mCommentsAdapter).execute();
+    		return true;
+    		
+    	case Constants.UNSAVE_CONTEXT_ITEM:
+    		new SaveTask(false, mOpThingInfo, mSettings, this, mCommentsAdapter).execute();
+    		return true;
+    		
+    	case Constants.SHARE_CONTEXT_ITEM:
+    		Intent intent = new Intent();
+			intent.setAction(Intent.ACTION_SEND);
+			intent.setType("text/plain");
+
+			intent.putExtra(Intent.EXTRA_TEXT, mOpThingInfo.getUrl());
+			
+			try {
+				startActivity(Intent.createChooser(intent, "Share Link"));
+			} catch (android.content.ActivityNotFoundException ex) {
+				
+			}
+			
+			return true;
+			
     	case Constants.DIALOG_HIDE_COMMENT:
     		hideComment(rowId);
     		return true;
+    		
     	case Constants.DIALOG_SHOW_COMMENT:
     		showComment(rowId);
     		return true;
+    		
     	case Constants.DIALOG_GOTO_PARENT:
     		synchronized (COMMENT_ADAPTER_LOCK) {
     			int myIndent = mCommentsAdapter.getItem(rowId).getIndent();
@@ -1798,6 +1837,7 @@ public class CommentsListActivity extends ListActivity
 	    		getListView().setSelectionFromTop(parentRowId, 10);
     		}
     		return true;
+    		
     	case Constants.DIALOG_EDIT:
     		synchronized (COMMENT_ADAPTER_LOCK) {
 	    		mReplyTargetName = mCommentsAdapter.getItem(rowId).getName();
@@ -1805,6 +1845,7 @@ public class CommentsListActivity extends ListActivity
     		}
     		showDialog(Constants.DIALOG_EDIT);
     		return true;
+    		
     	case Constants.DIALOG_DELETE:
     		synchronized (COMMENT_ADAPTER_LOCK) {
     			mReplyTargetName = mCommentsAdapter.getItem(rowId).getName();
@@ -1813,12 +1854,14 @@ public class CommentsListActivity extends ListActivity
     		mDeleteTargetKind = Constants.COMMENT_KIND;
     		showDialog(Constants.DIALOG_DELETE);
     		return true;
+    		
     	case Constants.DIALOG_REPORT:
     		synchronized (COMMENT_ADAPTER_LOCK) {
     			mReportTargetName = mCommentsAdapter.getItem(rowId).getName();
     		}
     		showDialog(Constants.DIALOG_REPORT);
     		return true;
+    		
 		default:
     		return super.onContextItemSelected(item);	
     	}
@@ -2068,7 +2111,7 @@ public class CommentsListActivity extends ListActivity
     		if (mVoteTargetThing == mOpThingInfo) {
 				likes = mVoteTargetThing.getLikes();
     			titleView.setVisibility(View.VISIBLE);
-    			titleView.setText(mOpThingInfo.getTitle().replaceAll("\n ", " ").replaceAll(" \n", " ").replaceAll("\n", " "));
+    			titleView.setText(mOpThingInfo.getTitle());
     			urlView.setVisibility(View.VISIBLE);
     			urlView.setText(mOpThingInfo.getUrl());
     			submissionStuffView.setVisibility(View.VISIBLE);

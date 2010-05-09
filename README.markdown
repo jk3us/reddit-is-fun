@@ -12,10 +12,13 @@ Contributors:
 * jc4p
 * albertb
 * samongoose
+* fernandotakai
 * billyf
 * jaspervdj
 * kostmo
 * armooo
+* fberger
+* faux
 
 Android Market QR Codes
 ----------------
