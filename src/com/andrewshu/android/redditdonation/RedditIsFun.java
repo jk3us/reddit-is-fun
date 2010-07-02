@@ -49,6 +49,8 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Resources;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.SpannableString;
@@ -155,7 +157,10 @@ public final class RedditIsFun extends ListActivity {
         if (savedInstanceState != null) {
         	if (Constants.LOGGING) Log.d(TAG, "using savedInstanceState");
 			CharSequence subreddit = savedInstanceState.getCharSequence(Constants.SUBREDDIT_KEY);
-	        if (subreddit != null)
+	        
+			
+			
+			if (subreddit != null)
 	        	mSettings.setSubreddit(subreddit);
 	        else
 	        	mSettings.setSubreddit(mSettings.homepage);
@@ -165,6 +170,9 @@ public final class RedditIsFun extends ListActivity {
 	        mSortByUrl = savedInstanceState.getCharSequence(Constants.ThreadsSort.SORT_BY_KEY);
 		    mJumpToThreadId = savedInstanceState.getCharSequence(Constants.JUMP_TO_THREAD_ID_KEY);
 		    mVoteTargetThingInfo = savedInstanceState.getParcelable(Constants.VOTE_TARGET_THING_INFO_KEY);
+        }
+        else {
+        	mSettings.setSubreddit(mSettings.homepage);
         }
     }
     
@@ -388,7 +396,19 @@ public final class RedditIsFun extends ListActivity {
 	            
 	            // Thumbnails open links
 	            if (thumbnailView != null) {
-	            	if (mSettings.loadThumbnails) {
+	            	
+	            	//check for wifi connection and wifi thumbnail setting
+	            	boolean thumbOkay = true;
+	            	if (mSettings.loadThumbnailsOnlyWifi)
+	            	{
+	            		thumbOkay = false;
+	            		ConnectivityManager connMan = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+	            		NetworkInfo netInfo = connMan.getActiveNetworkInfo();
+	            		if (netInfo.getType() == ConnectivityManager.TYPE_WIFI && netInfo.isConnected()) {
+	            			thumbOkay = true;
+	            		}
+	            	}
+	            	if (mSettings.loadThumbnails && thumbOkay) {
 	            		dividerView.setVisibility(View.VISIBLE);
 	            		thumbnailView.setVisibility(View.VISIBLE);
 	            		indeterminateProgressBar.setVisibility(View.GONE);
